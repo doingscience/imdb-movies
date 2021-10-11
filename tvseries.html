@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html>
+<meta charset="utf-8">
+
+<!-- Example based on http://bl.ocks.org/mbostock/3887118 -->
+<!-- Tooltip example from http://www.d3noob.org/2013/01/adding-tooltips-to-d3js-graph.html -->
+<!-- Coding style based on http://gist.github.com/mbostock/5977197 -->
+
+<style>
+body {
+}
+
+.axis path,
+.axis line {
+    fill: none;
+    stroke: #000;
+    shape-rendering: crispEdges;
+}
+
+.line {
+    fill: none;
+    stroke: steelblue;
+    stroke-width: 3;
+}
+
+.dot {
+    stroke: #000;
+    opacity: 0.5;
+}
+
+.tooltip {
+    position: absolute;
+    width: 13em;
+    height: 6em;
+    background-color: white;
+    border: solid;
+    border-width: 1px;
+    border-radius: 5px;
+    pointer-events: none;
+    padding: 10px;
+}
+
+input {
+  padding : 0 1em;
+  margin: 0px 1em;
+  border-radius: 5px;
+  background : none;
+}
+
+#title {
+}
+
+#chart {
+}
+
+input:focus {
+  background   : rgba(0,0,0,.1);
+  border-radius: 5px;
+}
+
+
+.space { margin:0; padding:0; height:20px; }
+
+
+
+
+
+
+
+
+</style>
+<head>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.1/dist/css/bootstrap.min.css" rel="stylesheet"
+          integrity="sha384-F3w7mX95PdgyTmZZMECAngseQB83DfGTowi0iMjiWaeVhAn4FJkqJByhZMI3AhiU" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.1/dist/js/bootstrap.bundle.min.js"
+            integrity="sha384-/bQdsTh/da6pkI1MST/rWKFNjaCP5gBSY4sEBT38Q/9RBh9AH40zEOg7Hlq2THRZ"
+            crossorigin="anonymous"></script>
+</head>
+<body>
+
+<div class="container">
+    <div class=”row”><h1>TV Shows</h1></div>
+    <div class=”row”><h6>Average IMDb user ratings, by show and season*</h6></div>
+
+    <div class="space"></div>
+    <div class=”row”>
+        <div class=”col-xs-6 col-md-4”>
+            <div class="form-outline">
+                <input type="text" id="seriesTitle" placeholder="Series Title" class="form-control w-25"/>
+            </div>
+        </div>
+    </div>
+    <div class=”row”>
+        <div id="chart" class=”col-xs-6 col-md-4”></div>
+    </div>
+    <div class=”row”>
+
+        <p>Adapted from the <a href="https://www.economist.com/graphic-detail/2018/11/24/tvs-golden-age-is-real">Economist's
+            analysis of TV shows in America</a>
+        </p>
+
+    </div>
+</div>
+
+<script src="https://d3js.org/d3.v5.min.js"></script>
+
+<script>
+  var margin = {top: 20, right: 20, bottom: 30, left: 30},
+      <!--width = 1300 - margin.left - margin.right,-->
+      width = d3.select("#chart")._groups[0][0].clientWidth;
+      height = 700 - margin.top - margin.bottom;
+
+/*
+ * value accessor - returns the value to encode for a given data object.
+ * scale - maps value to a visual display encoding, such as a pixel position.
+ * map function - maps from data value to display value
+ * axis - sets up axis
+ */
+
+// setup x
+  var xValue = function(d) { return d["year"];}, // data -> value
+      xScale = d3.scaleLinear().range([0, width]), // value -> display
+      xMap = function(d) { return xScale(xValue(d));}, // data -> display
+      xAxis = d3.axisBottom(xScale).tickFormat(d3.format("d"));
+
+// setup y
+  var yValue = function(d) { return d["averageRating"];}, // data -> value
+      yScale = d3.scaleLinear().range([height, 0]), // value -> display
+      yMap = function(d) { return yScale(yValue(d));}, // data -> display
+      yAxis = d3.axisLeft(yScale);
+
+// setup circle size
+  var sValue = function(d) { return Math.sqrt(d["propVotes"]);};
+
+// add the graph canvas to the body of the webpage
+  var svg = d3.select("#chart").append("svg")
+    .attr("width", width + margin.left + margin.right)
+    .attr("height", height + margin.top + margin.bottom)
+    .append("g")
+    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+// add the tooltip area to the webpage
+  var tooltip = d3.select("#chart").append("div")
+      .attr("class", "tooltip")
+      .style("opacity", 0);
+
+  var line = d3.line()
+    .x(d => { return xScale(d[0]); })
+    .y(d => { return yScale(d[1]); })
+    .curve(d3.curveMonotoneX);
+
+  var seriesLine;
+  var selSeries;
+
+  var updateSeriesLine = function(seriesArray) {
+    seriesLine.attr("d", line(seriesArray))
+      .attr("class", "line");
+  }
+
+  var clearSelection = function(selSeries) {
+    d3.selectAll("[series=" + selSeries["parentTconst"] + "]")
+      .style("opacity", 0.5)
+      .style("fill", "lightsteelblue");
+    seriesLine.style("stroke-width", 0);
+  }
+
+  var drawSeriesLine = function(lineData, selSeries) {
+    d3.selectAll("[series=" + selSeries["parentTconst"] + "]")
+      .style("opacity", 1)
+      .style("fill", "steelblue").raise();
+    var lineDatum = lineData[selSeries["parentTconst"]];
+    var lineArray = lineDatum.year.map(function (e, i) {
+      return [e, lineDatum.averageRating[i]];
+    });
+    lineArray.sort((a, b) => a[0] - b[0]);
+    updateSeriesLine(lineArray);
+    seriesLine.style("stroke-width", 3).raise();
+  }
+
+  // load data
+  Promise.all([
+    d3.csv("to_show.csv"),
+    d3.json("lines.json")
+  ]).then(function(files) {
+    var data = files[0];
+    var lineData = files[1];
+
+  // change string (from CSV) into number format
+    data.forEach(function(d) {
+      d["year"] = +d["year"];
+      d["averageRating"] = +d["averageRating"];
+    });
+
+  // don't want dots overlapping axis, so add in buffer to data domain
+  xScale.domain([d3.min(data, xValue)-1, d3.max(data, xValue)+1]);
+  yScale.domain([d3.min(data, yValue), d3.max(data, yValue)]);
+
+  seriesLine = this.svg.append("path")
+    .attr('class', 'line');
+
+  // x-axis
+  svg.append("g")
+    .attr("class", "x axis")
+    .attr("transform", "translate(0," + height + ")")
+    .call(xAxis)
+    .append("text")
+    .attr("class", "label")
+    .attr("x", width)
+    .attr("y", -6)
+    .style("text-anchor", "end")
+    .text("Year");
+
+  // y-axis
+  svg.append("g")
+    .attr("class", "y axis")
+    .call(yAxis)
+    .append("text")
+    .attr("class", "label")
+    .attr("transform", "rotate(-90)")
+    .attr("y", 6)
+    .attr("dy", ".71em")
+    .style("text-anchor", "end")
+    .text("Average Rating");
+
+  seriesLine = this.svg.append("path")
+    .attr('class', 'line')
+    .attr("stroke", 0);
+
+  // draw dots
+  svg.selectAll(".dot")
+    .data(data)
+    .enter().append("circle")
+    .attr("class", "dot")
+    .attr("series", function(d) { return d["parentTconst"]; })
+    .attr("r", function(d) { return 5 * sValue(d); })
+    .attr("cx", xMap)
+    .attr("cy", yMap)
+    .style("fill", "lightsteelblue")
+     .on("click", function(d) {
+       window.open(
+      'https://www.imdb.com/title/'+d["parentTconst"]+'/',
+      '_blank' // <- This is what makes it open in a new window.
+    );
+    })
+    .on("mouseover", function(d) {
+      var seriesTitleDOM = d3.select("#seriesTitle");
+      seriesTitleDOM.property("value", "");
+      seriesTitleDOM.node().blur();
+      document.getElementById("seriesTitle").blur();
+      if (selSeries) {
+        clearSelection(selSeries);
+      }
+      d3.selectAll("[series=" + d["parentTconst"] + "]")
+        .style("opacity", 1)
+        .style("fill", "steelblue").raise();
+      tooltip.style("opacity", .9);
+      tooltip.html(d["primaryTitle"] + "<br/>"
+        + "Year: " + Math.round(xValue(d)) + "<br/>"
+        + "Average Rating: " + yValue(d).toFixed(2))
+        .style("left", (d3.event.pageX + 5) + "px")
+        .style("top", (d3.event.pageY - 28) + "px");
+      drawSeriesLine(lineData, d);
+    })
+    .on("mouseleave", function(d) {
+      d3.selectAll("[series=" + d["parentTconst"] + "]")
+        .style("opacity", 0.5)
+        .style("fill", "lightsteelblue");
+      tooltip.style("opacity", 0);
+      seriesLine.style("stroke-width", 0);
+    });
+
+  d3.select("#seriesTitle").on("input", function () {
+    var seriesTitle = this.value;
+    if (selSeries) {
+      clearSelection(selSeries);
+    }
+    selSeries = data.find(el => {
+      return (el.primaryTitle.toLowerCase() === seriesTitle.toLowerCase());
+    });
+    if (!selSeries) {
+      return;
+    }
+    drawSeriesLine(lineData, selSeries);
+  });
+
+}).catch(function(err) {
+    console.log(err);
+});
+
+
+
+
+</script>
+
+</body>
+</html>
