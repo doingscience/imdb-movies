@@ -18,7 +18,6 @@ penv
 .DS_Store
 *.gz
 
-
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -147,4 +146,8 @@ venv.bak/
 dmypy.json
 
 # Pyre type checker
+<<<<<<< HEAD
 .pyre/
+=======
+.pyre/
+>>>>>>> 2e2bc3c97d4b06d9f89330fb1cab6328e9f99e05
