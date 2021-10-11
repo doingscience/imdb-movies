@@ -126,6 +126,7 @@ titles_episodes_rankings_df['year'] = titles_episodes_rankings_df.apply(
     axis=1
 )
 
+
 titles_episodes_rankings_df.query('primaryTitle == "Game of Thrones"')[::8]
 
 to_show = titles_episodes_rankings_df[
